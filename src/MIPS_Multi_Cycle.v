@@ -17,23 +17,21 @@ module MIPS_Multi_Cycle
 localparam BUS = 32;
 
 /***********        Wires declaration for interconect the modules     ***********/
-wire [BUS-1:0]  MS_Rdat;    //Wires for Memory System module
-wire [BUS-1:0]  RF_RD1, RF_RD2; //Wires for Register File
-wire ALU_z, PCen;
-wire [BUS-1:0]  ALUresult; //Wires for Alu module
-wire [BUS-1:0]  SignImm; //SignExtender wire
+wire    [BUS-1:0]  MS_Rdat;    //Wires for Memory System module
+wire    [BUS-1:0]  RF_RD1, RF_RD2; //Wires for Register File
+wire               ALU_z, PCen;
+wire    [BUS-1:0]  ALUresult; //Wires for Alu module
+wire    [BUS-1:0]  SignImm; //SignExtender wire
 
 
 /***********        Wires for Registers and Multiplexers              ***********/
 wire [BUS-1:0]  PC_reg, Instr_reg, Data_reg, A_reg, B_reg, ALU_reg; //REGISTERS
 wire [BUS-1:0]  AdrSM_mux, WDRF_mux, SrcA_mux, SrcB_mux, PCin_mux;   //MULTIPLEXERS
 wire [4:0] A3RF_mux;
-wire signed [15:0] ImmSigned;
 
 assign PCen = PCWrite || (Branch && ALU_z);
 assign GPIO_o = ALUresult[7:0];
-assign ImmSigned = Instr_reg[15:0];
-assign SignImm = (ImmSigned < 16'd0)? {16'hFFFF, ImmSigned}: {16'd0, ImmSigned}; 
+
 
 
 /***********        Modules Instanciation         ***********/
@@ -67,6 +65,12 @@ ALU_U2(
 	.select(ALUControl),
     .Z(ALU_z),
     .ALUres(ALUresult)	
+);
+
+SignExtend SigExt_U14(
+    .Oppcode(Instr_reg[31:26]),
+    .Imm(Instr_reg[15:0]),
+    .ExtImm(SignImm)
 );
 
 /***********        Registers Instanciation       ***********/
