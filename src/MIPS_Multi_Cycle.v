@@ -8,8 +8,8 @@ module MIPS_Multi_Cycle
 
     /******** Señales de Control ***********/
     input IorD, MemWrite, IRWrite, PCWrite,
-    input Branch, PCSrc, ALUSrcA, RegWrite,
-    input MemtoReg, RegDst,
+    input BranchEq, PCSrc, ALUSrcA, RegWrite,
+    input MemtoReg, RegDst, BranchNeq,
     input [1:0] ALUSrcB,
     input [3:0] ALUControl
     /***************************************/
@@ -25,11 +25,11 @@ wire    [BUS-1:0]  SignImm; //SignExtender wire
 
 
 /***********        Wires for Registers and Multiplexers              ***********/
-wire [BUS-1:0]  PC_reg, Instr_reg, Data_reg, A_reg, B_reg, ALU_reg; //REGISTERS
+wire [BUS-1:0]  PC_reg, Instr_reg, Data_reg, A_reg, B_reg, ACC_reg; //REGISTERS
 wire [BUS-1:0]  AdrSM_mux, WDRF_mux, SrcA_mux, SrcB_mux, PCin_mux;   //MULTIPLEXERS
 wire [4:0] A3RF_mux;
 
-assign PCen = PCWrite || (Branch && ALU_z);
+assign PCen = PCWrite || (BranchEq && ALU_z) || (BranchNeq && ~ALU_z) ;
 assign GPIO_o = ALUresult[7:0];
 
 
@@ -61,7 +61,6 @@ ALU #(.WIDTH(BUS))
 ALU_U2(
     .A_in(SrcA_mux),
     .B_in(SrcB_mux),
-	.c_in(1'b0),
 	.select(ALUControl),
     .Z(ALU_z),
     .ALUres(ALUresult)	
@@ -74,7 +73,7 @@ SignExtend SigExt_U14(
 );
 
 /***********        Registers Instanciation       ***********/
-RegisterUnit#(.W(BUS))
+RegisterUnit#(.W(BUS), .RstValue(32'h0040_0000))
 PC_U3(
     .clk(clk),
     .rst(reset),
@@ -111,18 +110,18 @@ RFreg_U6(
 );
 
 RegisterUnit#(.W(BUS))
-ALUreg_U7(
+ACC_U7(
     .clk(clk),
     .rst(reset),
     .en(1'b1),
     .D(ALUresult),
-    .Q(ALU_reg)
+    .Q(ACC_reg)
 );
 
 /***********        Multiplexers Instanciation    ***********/
 MultiplexerUnit#(.SEL(1), .WORD(BUS))
 DIRmux_U8(
-    .DATAin({ALU_reg, PC_reg}),
+    .DATAin({ACC_reg, PC_reg}),
     .Select(IorD),
     .DATAout(AdrSM_mux)
 );
@@ -136,7 +135,7 @@ WRRFmux_U9(
 
 MultiplexerUnit#(.SEL(1), .WORD(BUS))
 WDRFmux_U10(
-    .DATAin({Data_reg, ALU_reg}),
+    .DATAin({Data_reg, ACC_reg}),
     .Select(MemtoReg),
     .DATAout(WDRF_mux)
 );
@@ -150,14 +149,14 @@ Aselmux_U11(
 
 MultiplexerUnit#(.SEL(2), .WORD(BUS))
 Bselmux_U12(
-    .DATAin({SignImm << 16, SignImm, 32'h4, B_reg}),
+    .DATAin({SignImm << 2, SignImm, 32'h4, B_reg}),
     .Select(ALUSrcB),
     .DATAout(SrcB_mux)
 );
 
 MultiplexerUnit#(.SEL(1), .WORD(BUS))
 PCselmux_U13(
-    .DATAin({ALU_reg, ALUresult}),
+    .DATAin({ACC_reg, ALUresult}),
     .Select(PCSrc),
     .DATAout(PCin_mux)
 );
